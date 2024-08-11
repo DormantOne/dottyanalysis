@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultrasound Circle Movement with Principal Axis</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+        #output {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ultrasound Image Circle Movement with Principal Axis</h1>
+    <canvas id="ultrasoundCanvas" width="512" height="512"></canvas>
+    <button id="loadImageButton">Load Image from GitHub and Start</button>
+    <div id="output"></div>
+    <script>
+        const canvas = document.getElementById('ultrasoundCanvas');
+        const ctx = canvas.getContext('2d');
+        const loadImageButton = document.getElementById('loadImageButton');
+        const circles = [];
+        const numCircles = 100;
+        const circleRadius = 5;
+        const slowCircles = [];
+        let centerOfGravity = null;
+        let principalAxis = null;
+
+        // Replace this URL with the URL of your image on GitHub
+        const imageUrl = 'https://raw.githubusercontent.com/your-username/your-repo-name/main/your-image-name.png';
+
+        loadImageButton.addEventListener('click', () => {
+            loadImageFromGitHub(imageUrl);
+        });
+
+        function loadImageFromGitHub(url) {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous'; // This is needed to load images from GitHub without CORS issues
+            img.onload = function() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear previous image
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                // Initialize circles at random positions
+                for (let i = 0; i < numCircles; i++) {
+                    circles.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        speed: 1
+                    });
+                }
+
+                // Start the circle movement process
+                moveCircles(ctx, canvas.width, canvas.height);
+            };
+            img.src = url;
+        }
+
+        function moveCircles(ctx, canvasWidth, canvasHeight) {
+            const imgData = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+            const data = imgData.data;
+
+            function updateCircles() {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                ctx.putImageData(imgData, 0, 0);
+
+                slowCircles.length = 0; // Reset the slow circles list
+
+                circles.forEach(circle => {
+                    // Determine the intensity at the circle's current position
+                    const pixelIndex = (Math.floor(circle.y) * canvasWidth + Math.floor(circle.x)) * 4;
+                    const intensity = data[pixelIndex]; // Use red channel as a proxy for intensity
+
+                    // Adjust the speed to make slower circles more detectable
+                    circle.speed = (intensity / 20) ** 2 + 1; // Slower in light, faster in dark
+
+                    // Consider any circle with speed < 10 as "slow" for this purpose
+                    if (circle.speed < 10) {
+                        slowCircles.push(circle);
+                    }
+
+                    // Randomly move the circle
+                    circle.x += (Math.random() - 0.5) * circle.speed;
+                    circle.y += (Math.random() - 0.5) * circle.speed;
+
+                    // Constrain movement within canvas
+                    circle.x = Math.max(circleRadius, Math.min(circle.x, canvasWidth - circleRadius));
+                    circle.y = Math.max(circleRadius, Math.min(circle.y, canvasHeight - circleRadius));
+
+                    // Draw the circle
+                    ctx.beginPath();
+                    ctx.arc(circle.x, circle.y, circleRadius, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'red';
+                    ctx.fill();
+                });
+
+                // Continuously render the center of gravity and principal axis if they exist
+                if (centerOfGravity) {
+                    // Draw the yellow dot for center of gravity
+                    ctx.beginPath();
+                    ctx.arc(centerOfGravity.x, centerOfGravity.y, 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'yellow';
+                    ctx.fill();
+
+                    // Draw the principal axis as a blue line
+                    if (principalAxis) {
+                        drawPrincipalAxis(centerOfGravity, principalAxis);
+                    }
+                }
+
+                requestAnimationFrame(updateCircles);
+            }
+
+            updateCircles();
+        }
+
+        function calculateAndDisplayCenterOfGravity() {
+            if (slowCircles.length > 0) {
+                centerOfGravity = calculateCenterOfGravity(slowCircles);
+
+                // Select two random slow circles
+                const randomDot1 = slowCircles[Math.floor(Math.random() * slowCircles.length)];
+                const randomDot2 = slowCircles[Math.floor(Math.random() * slowCircles.length)];
+
+                // Draw the two random slow dots in green
+                ctx.beginPath();
+                ctx.arc(randomDot1.x, randomDot1.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(randomDot2.x, randomDot2.y, 10, 0, 2 * Math.PI);
+                ctx.fillStyle = 'green';
+                ctx.fill();
+
+                // Log the positions for verification
+                console.log("Center of Gravity Calculated:", centerOfGravity);
+                console.log("Random Dot 1:", randomDot1);
+                console.log("Random Dot 2:", randomDot2);
+
+                // Calculate the principal axis
+                principalAxis = calculatePrincipalAxis(slowCircles, centerOfGravity);
+            } else {
+                console.log("No slow circles detected.");
+            }
+        }
+
+        function calculateCenterOfGravity(circles) {
+            let sumX = 0, sumY = 0;
+            circles.forEach(circle => {
+                sumX += circle.x;
+                sumY += circle.y;
+            });
+            return {
+                x: sumX / circles.length,
+                y: sumY / circles.length
+            };
+        }
+
+        function calculatePrincipalAxis(circles, centerOfGravity) {
+            let sumXX = 0, sumXY = 0, sumYY = 0;
+
+            circles.forEach(circle => {
+                const dx = circle.x - centerOfGravity.x;
+                const dy = circle.y - centerOfGravity.y;
+
+                sumXX += dx * dx;
+                sumXY += dx * dy;
+                sumYY += dy * dy;
+            });
+
+            // Calculate the angle of the principal axis
+            const tan2Theta = (2 * sumXY) / (sumXX - sumYY);
+            const theta = 0.5 * Math.atan(tan2Theta);
+
+            return {
+                angle: theta,
+                length: Math.min(Math.sqrt(sumXX + sumYY), canvas.width / 2, canvas.height / 2) // Constrain length to canvas dimensions
+            };
+        }
+
+        function drawPrincipalAxis(center, axis) {
+            const length = axis.length; // Use the constrained length for visualization
+            const dx = length * Math.cos(axis.angle);
+            const dy = length * Math.sin(axis.angle);
+
+            // Ensure the line is drawn within canvas bounds
+            const startX = Math.max(0, Math.min(canvas.width, center.x - dx));
+            const startY = Math.max(0, Math.min(canvas.height, center.y - dy));
+            const endX = Math.max(0, Math.min(canvas.width, center.x + dx));
+            const endY = Math.max(0, Math.min(canvas.height, center.y + dy));
+
+            // Draw the principal axis as a blue line
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>
