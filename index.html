@@ -11,17 +11,22 @@
         #output {
             margin-top: 20px;
         }
+        #showCenterOfGravity {
+            display: none; /* Hidden initially */
+        }
     </style>
 </head>
 <body>
     <h1>Ultrasound Image Circle Movement with Principal Axis</h1>
     <canvas id="ultrasoundCanvas" width="512" height="512"></canvas>
     <button id="loadImageButton">Load Image from GitHub and Start</button>
+    <button id="showCenterOfGravity">Show Center of Gravity & Principal Axis</button>
     <div id="output"></div>
     <script>
         const canvas = document.getElementById('ultrasoundCanvas');
         const ctx = canvas.getContext('2d');
         const loadImageButton = document.getElementById('loadImageButton');
+        const showButton = document.getElementById('showCenterOfGravity');
         const circles = [];
         const numCircles = 100;
         const circleRadius = 5;
@@ -30,11 +35,13 @@
         let principalAxis = null;
 
         // Replace this URL with the URL of your image on GitHub
-        const imageUrl = 'https://dormantone.github.io/dottyanalysis/output.png';
+        const imageUrl = 'https://raw.githubusercontent.com/your-username/your-repo-name/main/your-image-name.png';
 
         loadImageButton.addEventListener('click', () => {
             loadImageFromGitHub(imageUrl);
         });
+
+        showButton.addEventListener('click', calculateAndDisplayCenterOfGravity);
 
         function loadImageFromGitHub(url) {
             const img = new Image();
@@ -54,6 +61,9 @@
 
                 // Start the circle movement process
                 moveCircles(ctx, canvas.width, canvas.height);
+
+                // Show the button for calculating center of gravity and principal axis
+                showButton.style.display = 'inline-block';
             };
             img.src = url;
         }
